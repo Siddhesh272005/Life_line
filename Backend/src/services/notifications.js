@@ -1,4 +1,5 @@
 const User = require('../models/User');
+const Notification = require('../models/Notification');
 const { getFirebaseAdmin } = require('../config/firebase');
 
 const normalizeData = (data = {}) => {
@@ -10,14 +11,38 @@ const normalizeData = (data = {}) => {
   return out;
 };
 
-const sendToUserIds = async ({ userIds = [], title, body, data = {} }) => {
+const sendToUserIds = async ({
+  userIds = [],
+  title,
+  body,
+  data = {},
+  type = 'general',
+  persistNotification = true,
+}) => {
   const admin = getFirebaseAdmin();
-  if (!admin || !Array.isArray(userIds) || userIds.length === 0) {
+  if (!Array.isArray(userIds) || userIds.length === 0) {
     return { sent: 0, skipped: true };
   }
 
   const uniqueIds = [...new Set(userIds.map(id => String(id)).filter(Boolean))];
   if (!uniqueIds.length) {
+    return { sent: 0, skipped: true };
+  }
+
+  if (persistNotification) {
+    const docs = uniqueIds.map((userId) => ({
+      userId,
+      title: String(title || 'Notification'),
+      message: String(body || ''),
+      type: String(type || 'general'),
+      data: normalizeData(data),
+    }));
+    try {
+      await Notification.insertMany(docs, { ordered: false });
+    } catch {}
+  }
+
+  if (!admin) {
     return { sent: 0, skipped: true };
   }
 

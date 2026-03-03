@@ -399,6 +399,8 @@ const notifySmartSearchDonors = asyncHandler(async (req, res) => {
     userIds: validDonorIds,
     title,
     body: message,
+    type: 'smart_donor_search',
+    persistNotification: false,
     data: {
       type: 'smart_donor_search',
       bloodGroup,

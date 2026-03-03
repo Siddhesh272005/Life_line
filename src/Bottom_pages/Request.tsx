@@ -14,7 +14,7 @@ import {
   Alert,
   ActivityIndicator,
 } from 'react-native';
-import { apiPost, apiPut } from '../api/client';
+import { apiGet, apiPost, apiPut } from '../api/client';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { BottomTabParamList } from '../types';
 import Mapbox, { MapView, Camera, ShapeSource, CircleLayer } from '@rnmapbox/maps';
@@ -44,7 +44,6 @@ const DEFAULT_COORD: [number, number] = [78.01, 11.27];
 const MAPBOX_COUNTRY = 'IN';
 const MAPBOX_LANGUAGE = 'en';
 const MAPBOX_TYPES = 'place,locality,neighborhood,poi';
-const MAPBOX_FALLBACK_TYPES = 'poi,address,place,locality,neighborhood';
 const GOOGLE_COUNTRY = 'in';
 
 type SearchResultItem = {
@@ -139,30 +138,17 @@ export default function Request(): JSX.Element {
   };
 
   const searchMapboxPlaces = async (q: string, proximity: [number, number]): Promise<SearchResultItem[]> => {
-    if (!MAPBOX_PUBLIC_TOKEN) return [];
-    const base = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(q)}.json`;
-    const common = `limit=10&country=${MAPBOX_COUNTRY}&language=${MAPBOX_LANGUAGE}&autocomplete=true&fuzzyMatch=true&proximity=${proximity[0]},${proximity[1]}&access_token=${encodeURIComponent(MAPBOX_PUBLIC_TOKEN)}`;
+    const proximityParam = `${proximity[0]},${proximity[1]}`;
+    const query =
+      `q=${encodeURIComponent(q)}` +
+      `&country=${encodeURIComponent(MAPBOX_COUNTRY)}` +
+      `&language=${encodeURIComponent(MAPBOX_LANGUAGE)}` +
+      `&types=${encodeURIComponent(MAPBOX_TYPES)}` +
+      `&proximity=${encodeURIComponent(proximityParam)}`;
 
-    const primaryRes = await fetch(`${base}?${common}&types=${MAPBOX_TYPES}`);
-    const primaryData = await primaryRes.json();
-    const primaryFeatures = Array.isArray(primaryData?.features) ? primaryData.features : [];
-
-    const hasPoi = primaryFeatures.some((item: any) => Array.isArray(item?.place_type) && item.place_type.includes('poi'));
-    let merged = primaryFeatures;
-    if (!hasPoi) {
-      const fallbackRes = await fetch(`${base}?${common}&types=${MAPBOX_FALLBACK_TYPES}`);
-      const fallbackData = await fallbackRes.json();
-      const fallbackFeatures = Array.isArray(fallbackData?.features) ? fallbackData.features : [];
-      const seen = new Set<string>();
-      merged = [...primaryFeatures, ...fallbackFeatures].filter((item: any) => {
-        const id = String(item?.id || '');
-        if (!id || seen.has(id)) return false;
-        seen.add(id);
-        return true;
-      });
-    }
-
-    return merged
+    const data = await apiGet(`/api/routes/geocode/search?${query}`);
+    const features = Array.isArray(data?.features) ? data.features : [];
+    return features
       .map((item: any) => {
         const coords = item?.center;
         if (!Array.isArray(coords) || coords.length !== 2) return null;
