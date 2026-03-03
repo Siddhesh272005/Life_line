@@ -18,7 +18,7 @@ import { apiGet, apiPost, apiPut } from '../api/client';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { BottomTabParamList } from '../types';
 import Mapbox, { MapView, Camera, ShapeSource, CircleLayer } from '@rnmapbox/maps';
-import { GOOGLE_PLACES_API_KEY, MAPBOX_PUBLIC_TOKEN } from '../config/runtime';
+import { MAPBOX_PUBLIC_TOKEN } from '../config/runtime';
 
 import * as Yup from 'yup';
 import { Formik } from 'formik';
@@ -44,7 +44,6 @@ const DEFAULT_COORD: [number, number] = [78.01, 11.27];
 const MAPBOX_COUNTRY = 'IN';
 const MAPBOX_LANGUAGE = 'en';
 const MAPBOX_TYPES = 'place,locality,neighborhood,poi';
-const GOOGLE_COUNTRY = 'in';
 
 type SearchResultItem = {
   id: string;
@@ -63,6 +62,7 @@ const parseCoordString = (value: string): [number, number] | null => {
 };
 
 export default function Request(): JSX.Element {
+  const hasMapToken = Boolean(MAPBOX_PUBLIC_TOKEN);
   const navigation = useNavigation<any>();
   const route = useRoute<RouteProp<BottomTabParamList, 'Request'>>();
   const editRequest = route.params?.request;
@@ -87,54 +87,6 @@ export default function Request(): JSX.Element {
       })
       .sort((a, b) => b.score - a.score)
       .map(entry => entry.item);
-  };
-
-  const searchGooglePlaces = async (q: string, proximity: [number, number]): Promise<SearchResultItem[]> => {
-    const key = GOOGLE_PLACES_API_KEY.trim();
-    if (!key) return [];
-
-    const [lon, lat] = proximity;
-    const autoUrl =
-      `https://maps.googleapis.com/maps/api/place/autocomplete/json` +
-      `?input=${encodeURIComponent(q)}` +
-      `&key=${encodeURIComponent(key)}` +
-      `&components=country:${GOOGLE_COUNTRY}` +
-      `&language=${MAPBOX_LANGUAGE}` +
-      `&locationbias=circle:50000@${lat},${lon}`;
-
-    const autoRes = await fetch(autoUrl);
-    const autoData = await autoRes.json();
-    const predictions = Array.isArray(autoData?.predictions) ? autoData.predictions.slice(0, 8) : [];
-    if (!predictions.length) return [];
-
-    const details = await Promise.all(
-      predictions.map(async (prediction: any) => {
-        const placeId = String(prediction?.place_id || '');
-        if (!placeId) return null;
-        const detailsUrl =
-          `https://maps.googleapis.com/maps/api/place/details/json` +
-          `?place_id=${encodeURIComponent(placeId)}` +
-          `&fields=name,formatted_address,geometry` +
-          `&key=${encodeURIComponent(key)}`;
-        try {
-          const detailsRes = await fetch(detailsUrl);
-          const detailsData = await detailsRes.json();
-          const result = detailsData?.result;
-          const loc = result?.geometry?.location;
-          if (typeof loc?.lng !== 'number' || typeof loc?.lat !== 'number') return null;
-          return {
-            id: `google-${placeId}`,
-            title: result?.name || prediction?.structured_formatting?.main_text || prediction?.description || 'Place',
-            subtitle: result?.formatted_address || prediction?.description || '',
-            center: [loc.lng, loc.lat] as [number, number],
-          } satisfies SearchResultItem;
-        } catch {
-          return null;
-        }
-      })
-    );
-
-    return details.filter((item: SearchResultItem | null): item is SearchResultItem => Boolean(item));
   };
 
   const searchMapboxPlaces = async (q: string, proximity: [number, number]): Promise<SearchResultItem[]> => {
@@ -172,10 +124,7 @@ export default function Request(): JSX.Element {
     try {
       setSearching(true);
       const proximity = pickedCoord || DEFAULT_COORD;
-      let results = await searchGooglePlaces(q, proximity);
-      if (!results.length) {
-        results = await searchMapboxPlaces(q, proximity);
-      }
+      const results = await searchMapboxPlaces(q, proximity);
       setSearchResults(rankResults(q, results).slice(0, 10));
     } catch {
       setSearchResults([]);
@@ -468,59 +417,67 @@ export default function Request(): JSX.Element {
                       ) : null}
 
                       <View style={styles.pickerMapWrap}>
-                        <MapView
-                          style={styles.pickerMap}
-                          styleURL="mapbox://styles/mapbox/satellite-streets-v12"
-                          onPress={event => {
-                            const geometry = event?.geometry;
-                            const coords =
-                              geometry && 'coordinates' in geometry
-                                ? geometry.coordinates
-                                : null;
-                            if (
-                              Array.isArray(coords) &&
-                              coords.length === 2 &&
-                              typeof coords[0] === 'number' &&
-                              typeof coords[1] === 'number'
-                            ) {
-                              setPickedCoord([coords[0], coords[1]]);
-                            }
-                          }}
-                        >
-                          <Camera
-                            centerCoordinate={pickedCoord || DEFAULT_COORD}
-                            zoomLevel={12}
-                            animationDuration={300}
-                          />
-                          {pickedCoord ? (
-                            <ShapeSource
-                              id="pickedPoint"
-                              shape={{
-                                type: 'FeatureCollection',
-                                features: [
-                                  {
-                                    type: 'Feature',
-                                    geometry: {
-                                      type: 'Point',
-                                      coordinates: pickedCoord,
+                        {hasMapToken ? (
+                          <MapView
+                            style={styles.pickerMap}
+                            styleURL="mapbox://styles/mapbox/satellite-streets-v12"
+                            onPress={event => {
+                              const geometry = event?.geometry;
+                              const coords =
+                                geometry && 'coordinates' in geometry
+                                  ? geometry.coordinates
+                                  : null;
+                              if (
+                                Array.isArray(coords) &&
+                                coords.length === 2 &&
+                                typeof coords[0] === 'number' &&
+                                typeof coords[1] === 'number'
+                              ) {
+                                setPickedCoord([coords[0], coords[1]]);
+                              }
+                            }}
+                          >
+                            <Camera
+                              centerCoordinate={pickedCoord || DEFAULT_COORD}
+                              zoomLevel={12}
+                              animationDuration={300}
+                            />
+                            {pickedCoord ? (
+                              <ShapeSource
+                                id="pickedPoint"
+                                shape={{
+                                  type: 'FeatureCollection',
+                                  features: [
+                                    {
+                                      type: 'Feature',
+                                      geometry: {
+                                        type: 'Point',
+                                        coordinates: pickedCoord,
+                                      },
+                                      properties: {},
                                     },
-                                    properties: {},
-                                  },
-                                ],
-                              }}
-                            >
-                              <CircleLayer
-                                id="pickedCircle"
-                                style={{
-                                  circleRadius: 7,
-                                  circleColor: '#F82306',
-                                  circleStrokeWidth: 2,
-                                  circleStrokeColor: '#FFFFFF',
+                                  ],
                                 }}
-                              />
-                            </ShapeSource>
-                          ) : null}
-                        </MapView>
+                              >
+                                <CircleLayer
+                                  id="pickedCircle"
+                                  style={{
+                                    circleRadius: 7,
+                                    circleColor: '#F82306',
+                                    circleStrokeWidth: 2,
+                                    circleStrokeColor: '#FFFFFF',
+                                  }}
+                                />
+                              </ShapeSource>
+                            ) : null}
+                          </MapView>
+                        ) : (
+                          <View style={styles.mapUnavailable}>
+                            <Text style={styles.mapUnavailableText}>
+                              Map unavailable: configure MAPBOX_PUBLIC_TOKEN.
+                            </Text>
+                          </View>
+                        )}
                       </View>
 
                       <View style={styles.pickerFooter}>
@@ -718,6 +675,18 @@ const styles = StyleSheet.create({
   },
   pickerMap: {
     flex: 1,
+  },
+  mapUnavailable: {
+    flex: 1,
+    backgroundColor: '#111',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+  },
+  mapUnavailableText: {
+    color: '#FFF',
+    textAlign: 'center',
+    fontWeight: '600',
   },
   searchBar: {
     flexDirection: 'row',

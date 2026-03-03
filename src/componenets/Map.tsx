@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { StyleSheet, View, Platform } from 'react-native';
+import { StyleSheet, View, Platform, Text } from 'react-native';
 import Mapbox, {
   MapView,
   Camera,
@@ -29,6 +29,7 @@ const Map = ({
   showUserLocation,
   followUser,
 }: MapProps) => {
+  const hasMapToken = Boolean(MAPBOX_PUBLIC_TOKEN);
   const [userCoord, setUserCoord] = useState<[number, number] | null>(null);
   const routeShape = useMemo<FeatureCollection<LineString>>(
     () => ({
@@ -89,62 +90,70 @@ const Map = ({
 
   return (
     <View style={styles.container}>
-      <MapView
-        styleURL="mapbox://styles/mapbox/satellite-streets-v12"
-        style={styles.map}
-        projection="globe"
-        logoPosition={Platform.OS === 'android' ? { bottom: 40, left: 10 } : undefined}
-        attributionPosition={Platform.OS === 'android' ? { bottom: 40, right: 10 } : undefined}
-      >
-        <Camera
-          bounds={followUser && userCoord ? undefined : bounds}
-          centerCoordinate={cameraCenter}
-          zoomLevel={12}
-          animationDuration={0}
-        />
-        {showUserLocation ? (
-          <>
-            <Mapbox.UserLocation
-              visible
-              onUpdate={loc => {
-                const coords = loc?.coords;
-                if (coords && typeof coords.longitude === 'number' && typeof coords.latitude === 'number') {
-                  setUserCoord([coords.longitude, coords.latitude]);
-                }
+      {hasMapToken ? (
+        <MapView
+          styleURL="mapbox://styles/mapbox/satellite-streets-v12"
+          style={styles.map}
+          projection="globe"
+          logoPosition={Platform.OS === 'android' ? { bottom: 40, left: 10 } : undefined}
+          attributionPosition={Platform.OS === 'android' ? { bottom: 40, right: 10 } : undefined}
+        >
+          <Camera
+            bounds={followUser && userCoord ? undefined : bounds}
+            centerCoordinate={cameraCenter}
+            zoomLevel={12}
+            animationDuration={0}
+          />
+          {showUserLocation ? (
+            <>
+              <Mapbox.UserLocation
+                visible
+                onUpdate={loc => {
+                  const coords = loc?.coords;
+                  if (coords && typeof coords.longitude === 'number' && typeof coords.latitude === 'number') {
+                    setUserCoord([coords.longitude, coords.latitude]);
+                  }
+                }}
+              />
+              <Mapbox.LocationPuck />
+            </>
+          ) : null}
+          <ShapeSource id="route" shape={routeShape}>
+            <LineLayer
+              id="routeLine"
+              style={{
+                lineColor: '#F82306',
+                lineWidth: 4,
+                lineCap: 'round',
+                lineJoin: 'round',
               }}
             />
-            <Mapbox.LocationPuck />
-          </>
-        ) : null}
-        <ShapeSource id="route" shape={routeShape}>
-          <LineLayer
-            id="routeLine"
-            style={{
-              lineColor: '#F82306',
-              lineWidth: 4,
-              lineCap: 'round',
-              lineJoin: 'round',
-            }}
-          />
-        </ShapeSource>
-        <ShapeSource id="points" shape={pointsShape}>
-          <CircleLayer
-            id="pointsCircle"
-            style={{
-              circleRadius: 6,
-              circleColor: [
-                'match',
-                ['get', 'role'],
-                'patient',
-                '#C11717',
-                '#1A9CFF',
-              ],
-              circleStrokeWidth: 2,
-              circleStrokeColor: '#FFFFFF',
-            }}
-          />
-        </ShapeSource>
-      </MapView>
+          </ShapeSource>
+          <ShapeSource id="points" shape={pointsShape}>
+            <CircleLayer
+              id="pointsCircle"
+              style={{
+                circleRadius: 6,
+                circleColor: [
+                  'match',
+                  ['get', 'role'],
+                  'patient',
+                  '#C11717',
+                  '#1A9CFF',
+                ],
+                circleStrokeWidth: 2,
+                circleStrokeColor: '#FFFFFF',
+              }}
+            />
+          </ShapeSource>
+        </MapView>
+      ) : (
+        <View style={styles.mapUnavailable}>
+          <Text style={styles.mapUnavailableText}>
+            Map is unavailable. Set a valid MAPBOX_PUBLIC_TOKEN in app runtime config.
+          </Text>
+        </View>
+      )}
     </View>
   );
 };
@@ -152,6 +161,18 @@ const Map = ({
 const styles = StyleSheet.create({
   container: { flex: 1 },
   map: { flex: 1 },
+  mapUnavailable: {
+    flex: 1,
+    backgroundColor: '#111',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+  },
+  mapUnavailableText: {
+    color: '#FFF',
+    textAlign: 'center',
+    fontWeight: '600',
+  },
 });
 
 export default Map;

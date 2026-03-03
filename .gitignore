@@ -82,4 +82,5 @@ Backend/.env.*
 !Backend/.env.example
 
 # local android token override file (keep secrets out of git)
+src/config/runtime.secrets.ts
 

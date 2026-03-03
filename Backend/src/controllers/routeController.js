@@ -89,16 +89,44 @@ const directions = asyncHandler(async (req, res) => {
   if (!start || !end) {
     return res.status(400).json({ message: 'Missing coordinates' });
   }
-  const token = process.env.MAPBOX_TOKEN;
+  const token = String(process.env.MAPBOX_TOKEN || '').trim();
+  const startParts = String(start).split(',').map((item) => Number(item));
+  const endParts = String(end).split(',').map((item) => Number(item));
+  const startCoordValid = startParts.length === 2 && !Number.isNaN(startParts[0]) && !Number.isNaN(startParts[1]);
+  const endCoordValid = endParts.length === 2 && !Number.isNaN(endParts[0]) && !Number.isNaN(endParts[1]);
+
+  if (isPlaceholderToken(token) || !startCoordValid || !endCoordValid) {
+    const geometry = {
+      type: 'LineString',
+      coordinates: startCoordValid && endCoordValid ? [startParts, endParts] : [],
+    };
+    return res.json({ route: { geometry, distance: null, duration: null, source: 'fallback' } });
+  }
+
   const url = `https://api.mapbox.com/directions/v5/mapbox/driving/${start};${end}`;
-  const response = await axios.get(url, {
-    params: {
-      geometries: 'geojson',
-      access_token: token,
-    },
-  });
-  const route = response.data.routes?.[0];
-  res.json({ route });
+  try {
+    const response = await axios.get(url, {
+      params: {
+        geometries: 'geojson',
+        access_token: token,
+      },
+    });
+    const route = response.data.routes?.[0];
+    if (!route) {
+      const geometry = {
+        type: 'LineString',
+        coordinates: [startParts, endParts],
+      };
+      return res.json({ route: { geometry, distance: null, duration: null, source: 'fallback' } });
+    }
+    return res.json({ route: { ...route, source: 'mapbox' } });
+  } catch {
+    const geometry = {
+      type: 'LineString',
+      coordinates: [startParts, endParts],
+    };
+    return res.json({ route: { geometry, distance: null, duration: null, source: 'fallback' } });
+  }
 });
 
 module.exports = { directions, geocodeSearch };
