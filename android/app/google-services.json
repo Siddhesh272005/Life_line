@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "811268251186",
+    "project_id": "lifeline-246df",
+    "storage_bucket": "lifeline-246df.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:811268251186:android:b296ab5c0dc6dae8ea262b",
+        "android_client_info": {
+          "package_name": "com.csp"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDM-_RRQ8iPX1-vISPzMwnnELd5y5Qn47k"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
