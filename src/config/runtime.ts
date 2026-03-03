@@ -1,5 +1,3 @@
-import { Platform } from 'react-native';
-
 const getRuntimeEnv = (key: string) => {
   const env = (globalThis as any)?.process?.env;
   if (!env || typeof env !== 'object') return '';
@@ -12,14 +10,11 @@ const getRuntimeEnv = (key: string) => {
 };
 
 const apiOverride = getRuntimeEnv('API_BASE_URL');
+const hostedApiBaseUrl = 'https://life-line-bkoo.onrender.com';
 
 export const API_BASE_URL =
   apiOverride ||
-  (Platform.OS === 'android'
-    ? 'http://10.0.2.2:5000'
-    : Platform.OS === 'ios'
-      ? 'http://127.0.0.1:5000'
-      : 'http://127.0.0.1:5000');
+  hostedApiBaseUrl;
 
 // Keep tokens out of source control. Provide these at build/runtime in your local setup.
 export const MAPBOX_PUBLIC_TOKEN = getRuntimeEnv('MAPBOX_PUBLIC_TOKEN');
