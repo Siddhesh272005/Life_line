@@ -82,5 +82,4 @@ Backend/.env.*
 !Backend/.env.example
 
 # local android token override file (keep secrets out of git)
-android/app/src/main/res/values/mapbox_access_token.local.xml
 
