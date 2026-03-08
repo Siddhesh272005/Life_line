@@ -95,8 +95,11 @@ android {
         // Resolve Mapbox token from local, non-committed sources first.
         def mapboxAccessToken =
             localProps.getProperty("MAPBOX_ACCESS_TOKEN") ?:
+            localProps.getProperty("MAPBOX_PUBLIC_TOKEN") ?:
             (project.hasProperty("MAPBOX_ACCESS_TOKEN") ? project.property("MAPBOX_ACCESS_TOKEN") : null) ?:
+            (project.hasProperty("MAPBOX_PUBLIC_TOKEN") ? project.property("MAPBOX_PUBLIC_TOKEN") : null) ?:
             System.getenv("MAPBOX_ACCESS_TOKEN") ?:
+            System.getenv("MAPBOX_PUBLIC_TOKEN") ?:
             "MAPBOX_TOKEN_NOT_SET"
         resValue "string", "mapbox_access_token", mapboxAccessToken
     }

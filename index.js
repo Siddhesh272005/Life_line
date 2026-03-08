@@ -18,12 +18,24 @@ const Root = () => (
 );
 
 const messaging = getMessaging(getApp());
+const CHANNEL_ID = 'csp_default';
+const CHANNEL_NAME = 'CSP Notifications';
 
 setBackgroundMessageHandler(messaging, async remoteMessage => {
+  try {
+    const existing = await notifee.getChannel(CHANNEL_ID);
+    if (existing && !existing.sound) {
+      await notifee.deleteChannel(CHANNEL_ID);
+    }
+  } catch {}
+
   await notifee.createChannel({
-    id: 'csp_default',
-    name: 'CSP Notifications',
+    id: CHANNEL_ID,
+    name: CHANNEL_NAME,
     importance: AndroidImportance.HIGH,
+    sound: 'default',
+    vibration: true,
+    lights: true,
   });
 
   await notifee.displayNotification({
@@ -31,7 +43,8 @@ setBackgroundMessageHandler(messaging, async remoteMessage => {
     body: remoteMessage.notification?.body || '',
     data: remoteMessage.data,
     android: {
-      channelId: 'csp_default',
+      channelId: CHANNEL_ID,
+      importance: AndroidImportance.HIGH,
       smallIcon: 'ic_launcher',
       pressAction: { id: 'default' },
     },

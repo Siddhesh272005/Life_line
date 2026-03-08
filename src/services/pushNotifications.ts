@@ -17,13 +17,29 @@ import { apiDelete, apiPut } from '../api/client';
 
 let currentToken: string | null = null;
 const messaging = getMessaging(getApp());
+const CHANNEL_ID = 'csp_default';
+const CHANNEL_NAME = 'CSP Notifications';
 
 const ensureAndroidChannel = async () => {
   if (Platform.OS !== 'android') return;
+  let existing: any = null;
+  try {
+    existing = await notifee.getChannel(CHANNEL_ID);
+  } catch {}
+  // Channel sound/importance can become sticky on Android.
+  // Recreate a known-good channel config when it is silent.
+  if (existing && !existing.sound) {
+    try {
+      await notifee.deleteChannel(CHANNEL_ID);
+    } catch {}
+  }
   await notifee.createChannel({
-    id: 'csp_default',
-    name: 'CSP Notifications',
+    id: CHANNEL_ID,
+    name: CHANNEL_NAME,
     importance: AndroidImportance.HIGH,
+    sound: 'default',
+    vibration: true,
+    lights: true,
   });
 };
 
@@ -96,7 +112,7 @@ export const setupPushListeners = async ({
       body,
       data: remoteMessage.data,
       android: {
-        channelId: 'csp_default',
+        channelId: CHANNEL_ID,
         importance: AndroidImportance.HIGH,
         smallIcon: 'ic_launcher',
         pressAction: { id: 'default' },

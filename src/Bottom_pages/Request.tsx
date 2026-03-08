@@ -61,6 +61,47 @@ const parseCoordString = (value: string): [number, number] | null => {
   return [lon, lat];
 };
 
+const searchWithNominatimDirect = async (
+  q: string,
+  country: string,
+  language: string
+): Promise<SearchResultItem[]> => {
+  const params =
+    `q=${encodeURIComponent(q)}` +
+    `&format=jsonv2` +
+    `&limit=10` +
+    `&addressdetails=1` +
+    (country ? `&countrycodes=${encodeURIComponent(country.toLowerCase())}` : '') +
+    (language ? `&accept-language=${encodeURIComponent(language)}` : '');
+
+  const res = await fetch(`https://nominatim.openstreetmap.org/search?${params}`, {
+    method: 'GET',
+    headers: {
+      Accept: 'application/json',
+    },
+  });
+
+  if (!res.ok) {
+    throw new Error(`Search fallback failed (${res.status})`);
+  }
+
+  const data = await res.json();
+  const rows = Array.isArray(data) ? data : [];
+  return rows
+    .map((item: any) => {
+      const lon = Number(item?.lon);
+      const lat = Number(item?.lat);
+      if (Number.isNaN(lon) || Number.isNaN(lat)) return null;
+      return {
+        id: `osm-${item?.place_id || `${lon}-${lat}`}`,
+        title: item?.name || item?.display_name || 'Place',
+        subtitle: item?.display_name || '',
+        center: [lon, lat] as [number, number],
+      } satisfies SearchResultItem;
+    })
+    .filter((item: SearchResultItem | null): item is SearchResultItem => Boolean(item));
+};
+
 export default function Request(): JSX.Element {
   const hasMapToken = Boolean(MAPBOX_PUBLIC_TOKEN);
   const navigation = useNavigation<any>();
@@ -98,21 +139,26 @@ export default function Request(): JSX.Element {
       `&types=${encodeURIComponent(MAPBOX_TYPES)}` +
       `&proximity=${encodeURIComponent(proximityParam)}`;
 
-    const data = await apiGet(`/api/routes/geocode/search?${query}`);
-    const features = Array.isArray(data?.features) ? data.features : [];
-    return features
-      .map((item: any) => {
-        const coords = item?.center;
-        if (!Array.isArray(coords) || coords.length !== 2) return null;
-        if (typeof coords[0] !== 'number' || typeof coords[1] !== 'number') return null;
-        return {
-          id: String(item?.id || `${coords[0]}-${coords[1]}`),
-          title: item?.text || item?.place_name || 'Place',
-          subtitle: item?.place_name || '',
-          center: [coords[0], coords[1]] as [number, number],
-        } satisfies SearchResultItem;
-      })
-      .filter((item: SearchResultItem | null): item is SearchResultItem => Boolean(item));
+    try {
+      const data = await apiGet(`/api/routes/geocode/search?${query}`);
+      const features = Array.isArray(data?.features) ? data.features : [];
+      const mapped = features
+        .map((item: any) => {
+          const coords = item?.center;
+          if (!Array.isArray(coords) || coords.length !== 2) return null;
+          if (typeof coords[0] !== 'number' || typeof coords[1] !== 'number') return null;
+          return {
+            id: String(item?.id || `${coords[0]}-${coords[1]}`),
+            title: item?.text || item?.place_name || 'Place',
+            subtitle: item?.place_name || '',
+            center: [coords[0], coords[1]] as [number, number],
+          } satisfies SearchResultItem;
+        })
+        .filter((item: SearchResultItem | null): item is SearchResultItem => Boolean(item));
+      if (mapped.length) return mapped;
+    } catch {}
+
+    return searchWithNominatimDirect(q, MAPBOX_COUNTRY, MAPBOX_LANGUAGE);
   };
 
   const searchLocation = async () => {
@@ -126,9 +172,10 @@ export default function Request(): JSX.Element {
       const proximity = pickedCoord || DEFAULT_COORD;
       const results = await searchMapboxPlaces(q, proximity);
       setSearchResults(rankResults(q, results).slice(0, 10));
-    } catch {
+    } catch (error) {
       setSearchResults([]);
-      Alert.alert('Search failed', 'Unable to fetch location suggestions. Check internet and try again.');
+      const message = error instanceof Error ? error.message : 'Unable to fetch location suggestions.';
+      Alert.alert('Search failed', `${message} Check internet and try again.`);
     } finally {
       setSearching(false);
     }
