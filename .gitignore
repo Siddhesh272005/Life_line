@@ -84,3 +84,7 @@ Backend/.env.*
 # local android token override file (keep secrets out of git)
 src/config/runtime.secrets.ts
 
+# firebase service account key files
+*firebase-adminsdk*.json
+*service-account*.json
+
